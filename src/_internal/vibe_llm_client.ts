@@ -5,6 +5,7 @@ import { type GeminiClient, GeminiWrapper } from "../llms/gemini_wrapper.js"
 import { type OpenAiClient, OpenAiWrapper } from "../llms/openai_wrapper.js"
 import type { ReturnTypeSpec } from "../llms/return_type.js"
 import { VibeBaseLlm, type VibeLogger } from "../llms/vibe_base_llm.js"
+import { isWebLlmEngine, type WebLlmEngine } from "../llms/webllm_wrapper.js"
 import { VibeConfig, type VibeConfigOptions } from "./vibe_config.js"
 
 export type SharedClient = OpenAiClient | GeminiClient
@@ -27,6 +28,15 @@ export function isSdkInstance<T>(client: unknown, pkg: string, name: string): cl
     if (typeof ClientClass === "function" && client instanceof ClientClass) return true
   }
   return false
+}
+
+/** Prefer an installed Node SDK's native transport if it also exposes a WebLLM-shaped API. */
+export function usesLocalEngine(client: SharedClient | WebLlmEngine): client is WebLlmEngine {
+  return (
+    isWebLlmEngine(client) &&
+    !("responses" in client && isSdkInstance(client, "openai", "OpenAI")) &&
+    !("models" in client && isSdkInstance(client, "@google/genai", "GoogleGenAI"))
+  )
 }
 
 /** Select the provider from the supplied SDK client and apply one deadline to each evaluation. */

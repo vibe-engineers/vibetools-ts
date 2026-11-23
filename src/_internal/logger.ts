@@ -1,6 +1,8 @@
 const levels = { NOTSET: 0, DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 50 } as const
 type Level = keyof typeof levels
-const levelName = (process.env.VIBE_LOG_LEVEL ?? "ERROR").toUpperCase()
+const levelName = (
+  typeof process === "undefined" ? "ERROR" : (process.env?.VIBE_LOG_LEVEL ?? "ERROR")
+).toUpperCase()
 const configuredLevel =
   levelName === "WARN"
     ? levels.WARNING
@@ -45,7 +47,11 @@ export class ConsoleLogger {
   private write(level: Level, message: string): void {
     // NOTSET inherits the Python root logger's default threshold of WARNING.
     if (levels[level] >= (this.level || levels.WARNING)) {
-      process.stderr.write(`${this.#formatter.format(this.name, level, message)}\n`)
+      if (typeof process !== "undefined" && process.stderr?.write) {
+        process.stderr.write(`${this.#formatter.format(this.name, level, message)}\n`)
+      } else {
+        console.error(`[${this.name}] ${level}: ${message}`)
+      }
     }
   }
 

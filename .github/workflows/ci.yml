@@ -31,7 +31,7 @@ jobs:
       - run: npm test
       - if: matrix.node != '22.13.0'
         run: npm pack --dry-run
-      - name: Test each optional provider against the installed npm archive
+      - name: Test hosted SDKs and browser exports against the installed npm archive
         id: packed
         if: matrix.node == '22.13.0'
         run: |
@@ -57,6 +57,12 @@ jobs:
               node --test --test-name-pattern="$pattern" "$testfile"
             )
           done
+          browser_consumer=$(mktemp -d)
+          npm install --prefix "$browser_consumer" --no-audit --no-fund "$RUNNER_TEMP/$archive"
+          cp tests/browser/*.test.mjs "$browser_consumer/"
+          node --conditions=browser --test "$browser_consumer"/*.test.mjs
+          cp tests/transport.test.mjs "$browser_consumer/"
+          node --test --test-name-pattern=WebLLM "$browser_consumer/transport.test.mjs"
       - name: Upload the tested npm archive
         if: inputs.release_archive && matrix.node == '22.13.0'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

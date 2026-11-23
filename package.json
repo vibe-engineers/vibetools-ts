@@ -1,6 +1,6 @@
 {
   "name": "@vibe-engineers/vibetools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Core modules shared across Vibe Engineers libraries.",
   "license": "MIT",
   "publishConfig": {
@@ -17,6 +17,12 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "imports": {
+    "#describe-value": {
+      "browser": "./dist/_internal/describe_value.browser.js",
+      "default": "./dist/_internal/describe_value.node.js"
+    }
+  },
   "exports": {
     ".": "./dist/index.js",
     "./_internal": "./dist/_internal/index.js",
@@ -42,18 +48,22 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && tsc -p tsconfig.tests.json && node --test tests/*.test.mjs",
+    "test": "npm run build && tsc -p tsconfig.tests.json && node --test tests/*.test.mjs && node --conditions=browser --test tests/browser/*.test.mjs",
     "lint": "biome lint --config-path=./biome.json .",
     "format": "biome format --config-path=./biome.json --write .",
     "prepack": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && npm run build"
   },
   "peerDependencies": {
     "@google/genai": "^3.6.1",
+    "@mlc-ai/web-llm": "^0.2.89",
     "@typesafe-ai/sdk": "^0.7.0",
     "openai": "^7.62.0"
   },
   "peerDependenciesMeta": {
     "@google/genai": {
+      "optional": true
+    },
+    "@mlc-ai/web-llm": {
       "optional": true
     },
     "@typesafe-ai/sdk": {

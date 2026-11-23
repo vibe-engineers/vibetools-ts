@@ -30,7 +30,7 @@ Install VibeTools from npm.
 npm install @vibe-engineers/vibetools
 ```
 
-Install the SDK for the provider your application uses. Choose `openai` or `@google/genai` for text generation. For Jev judgments, install the optional TypeSafe SDK alongside VibeTools and set `TYPESAFE_API_KEY`. [Developer Guide](docs/DeveloperGuide.md) · [TypeSafe JavaScript SDK](https://github.com/typesafe-ai/typesafe-sdk-js)
+Install the SDK for the provider your application uses. On Node, use `openai` or `@google/genai` for text generation. For on-device browser inference, install `@mlc-ai/web-llm` and pass an initialized engine to a companion package. For Jev judgments, install the optional TypeSafe SDK alongside VibeTools and set `TYPESAFE_API_KEY`. [Developer Guide](docs/DeveloperGuide.md) · [TypeSafe JavaScript SDK](https://github.com/typesafe-ai/typesafe-sdk-js)
 
 ```sh
 npm install @vibe-engineers/vibetools "@typesafe-ai/sdk@^0.7.0"
@@ -40,6 +40,7 @@ npm install @vibe-engineers/vibetools "@typesafe-ai/sdk@^0.7.0"
 
 - **Shared LLM modules.** The OpenAI and Google Gemini wrappers share evaluation, response parsing, retries, and timeouts. Structured results preserve large integer literals as `bigint` and can use a handwritten validator or an optional synchronous Zod schema. [Response types](docs/DeveloperGuide.md#response-types)
 - **Jev judgments.** VibeChecks and VibeRetry use Jev's native probability for boolean conditions and retry decisions. VibeTools validates the probability directly. [TypeSafe Noul questions](https://docs.typesafe.ai/primitives/noul)
+- **Browser inference.** VibeChecks, VibeGen, and VibeRetry can share one application-owned WebLLM engine. It runs checks, generates typed values, and evaluates retry decisions on the device using the same parsers and deadlines as the companion APIs. [VibeChecks example](https://github.com/vibe-engineers/vibechecks-ts#using-webllm-in-a-browser) · [VibeGen example](https://github.com/vibe-engineers/vibegen-ts#using-webllm-in-a-browser) · [VibeRetry example](https://github.com/vibe-engineers/viberetry-ts#using-webllm-in-a-browser)
 - **Common base exceptions.** VibeTools exports exceptions such as `VibeTimeoutException` and `VibeResponseParseException` for use across libraries.
 - **Logger.** The shared console logger uses `VIBE_LOG_LEVEL` to control which messages it writes. [Logging](docs/DeveloperGuide.md#logging)
 
@@ -50,7 +51,7 @@ npm install @vibe-engineers/vibetools "@typesafe-ai/sdk@^0.7.0"
 <p align="center">
   <img height="150" width="150" src="https://www.typescriptlang.org/branding/ts-logo-128.svg" alt="TypeScript logo" />
 </p>
-<p align="center">TypeScript on Node.js 22.13 or later</p>
+<p align="center">TypeScript on Node.js 22.13 or later and in WebGPU-capable browsers</p>
 
 ##### Project Repository
 

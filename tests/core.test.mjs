@@ -13,6 +13,7 @@ import {
   VibeTimeoutException,
 } from "@vibe-engineers/vibetools"
 import { ConsoleLogger, VibeLlmClient } from "@vibe-engineers/vibetools/_internal"
+import { evaluateWithRetries } from "@vibe-engineers/vibetools/_internal/evaluation"
 import { VibeMode } from "@vibe-engineers/vibetools/_internal/vibe_mode"
 import { ColorFormatter } from "@vibe-engineers/vibetools/_internal/logger"
 import { VibeBaseLlm } from "@vibe-engineers/vibetools/llms/vibe_base_llm"
@@ -21,6 +22,22 @@ import { GeminiWrapper } from "@vibe-engineers/vibetools/llms/gemini_wrapper"
 
 const logger = new ConsoleLogger("test")
 const require = createRequire(import.meta.url)
+
+test("aborting a pending evaluation retry preserves the Node timer error and cause", async () => {
+  const controller = new AbortController()
+  const retrying = Promise.withResolvers()
+  const run = evaluateWithRetries(
+    async () => {
+      throw new VibeLlmApiException("unavailable")
+    },
+    VibeMode.EAGER,
+    { info: retrying.resolve },
+    { signal: controller.signal },
+  )
+  await retrying.promise
+  controller.abort("caller cancelled")
+  await assert.rejects(run, { name: "AbortError", code: "ABORT_ERR", cause: "caller cancelled" })
+})
 
 test("frozen config preserves Python defaults, case-insensitive modes and keyword checks", () => {
   const config = new VibeConfig()

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1
+
+- Added an optional WebLLM adapter for browser engines and workers, with constrained boolean responses.
+- Added browser argument formatting, JSON-constrained VibeGen results, and support for companion-specific prompt examples, completion checks, and the VibeRetry decision grammar.
+
 ## 0.1.0
 
 - Added an optional TypeSafe Jev adapter for probability judgments in VibeChecks and VibeRetry.

@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-VibeTools for TypeScript is in development at version `0.1.0`. For a report about the unreleased port, include the source revision you tested.
+The current release series is `0.1.x`. For a report about a source build, include the Git revision you tested.
 
 ## Reporting a Vulnerability
 

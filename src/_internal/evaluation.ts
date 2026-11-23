@@ -1,15 +1,32 @@
-import timers from "node:timers/promises"
 import {
   VibeLlmApiException,
   VibeResponseParseException,
   VibeTimeoutException,
 } from "../exceptions/exceptions.js"
 import type { VibeLogger } from "../llms/vibe_base_llm.js"
-import { rejectionMessage } from "./prompt.js"
+import { rejectionMessage } from "./error_message.js"
 import { VibeMode } from "./vibe_mode.js"
 
 const attemptsByMode = { [VibeMode.CHILL]: 1, [VibeMode.EAGER]: 2, [VibeMode.AGGRESSIVE]: 3 }
 const maxTimerDelay = 2_147_483_647
+
+function waitForRetry(signal?: AbortSignal, ref = true): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", abort)
+      resolve()
+    }, 1000)
+    if (!ref) timer.unref?.()
+    function abort() {
+      clearTimeout(timer)
+      // Match node:timers/promises when an AbortSignal cancels an outstanding wait.
+      const error = new Error("The operation was aborted", { cause: signal?.reason })
+      reject(Object.assign(error, { name: "AbortError", code: "ABORT_ERR" }))
+    }
+    if (signal?.aborted) abort()
+    else signal?.addEventListener("abort", abort, { once: true })
+  })
+}
 
 function isEvaluationError(
   error: unknown,
@@ -46,14 +63,7 @@ export async function evaluateWithRetries<T>(
       if (expected) logger.info(message)
       else logger.error(message)
       if (attempt === attempts) throw failure
-      if (options.signal) {
-        await timers.setTimeout(1000, undefined, options)
-      } else {
-        await new Promise<void>((resolve) => {
-          const retry = setTimeout(resolve, 1000)
-          if (options.ref === false) retry.unref()
-        })
-      }
+      await waitForRetry(options.signal, options.ref)
     }
   }
 }

@@ -53,3 +53,11 @@ export class VibeConfig {
     }
   }
 }
+
+/** Validate a caller-supplied Jev decision threshold without coercion or rounding. */
+export function validateProbabilityThreshold(value: unknown): number {
+  const message = "probability_threshold must be a finite number between 0 and 1."
+  if (typeof value !== "number") throw new TypeError(message)
+  if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError(message)
+  return value
+}

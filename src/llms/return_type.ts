@@ -152,8 +152,17 @@ function parseSchema(schema: Schema, value: unknown): unknown {
 export function parseResponse<S extends ReturnTypeSpec>(
   raw: string,
   expected: S & SynchronousSpec<S>,
+  beforeSchema: () => void,
 ): Evaluated<S>
-export function parseResponse(raw: string, expected: ReturnTypeSpec): unknown {
+export function parseResponse<S extends ReturnTypeSpec>(
+  raw: string,
+  expected: S & SynchronousSpec<S>,
+): Evaluated<S>
+export function parseResponse(
+  raw: string,
+  expected: ReturnTypeSpec,
+  beforeSchema: (() => void) | undefined = undefined,
+): unknown {
   if (expected == null || expected === String) return raw
   const name = typeof expected === "function" ? expected.name : "schema"
   const message = `Unable to parse response to expected ${name} type.`
@@ -165,7 +174,10 @@ export function parseResponse(raw: string, expected: ReturnTypeSpec): unknown {
       const value = parseJson(raw)
       if (expected === Array && Array.isArray(value)) return value
       if (expected === Object && isPlainObject(value)) return value
-      if ("parse" in expected) return parseSchema(expected, value)
+      if ("parse" in expected) {
+        beforeSchema?.()
+        return parseSchema(expected, value)
+      }
     }
   } catch (cause) {
     throw new VibeResponseParseException(message, { cause })

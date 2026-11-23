@@ -17,9 +17,11 @@
 
 ## Introduction
 
-VibeTools supplies the OpenAI and Gemini adapters and common evaluation logic used by VibeChecks, VibeGen, and VibeRetry. Its root exports `VibeConfig` and the shared exceptions. Libraries using the underlying clients import `ConsoleLogger` and `VibeLlmClient` from `@vibe-engineers/vibetools/_internal`. [VibeTools README](../README.md)
+VibeTools supplies the provider adapters and common evaluation logic used by VibeChecks, VibeGen, and VibeRetry. Its root exports `VibeConfig` and the shared exceptions. On Node, libraries can import `ConsoleLogger` and `VibeLlmClient` from `@vibe-engineers/vibetools/_internal`. Browser libraries using the adapter directly import `WebLlmWrapper` from `@vibe-engineers/vibetools/llms/webllm_wrapper` and `ConsoleLogger` from `@vibe-engineers/vibetools/_internal/logger`. [VibeTools README](../README.md)
 
 VibeChecks and VibeRetry can also use TypeSafe's Jev adapter to obtain a probability for a judgment.
+
+VibeChecks, VibeGen, and VibeRetry use `WebLlmWrapper` for local WebGPU inference. The application supplies an initialized main-thread or worker engine from the optional `@mlc-ai/web-llm` package. All three use non-streaming chat completions and can share the engine. [VibeChecks browser example](https://github.com/vibe-engineers/vibechecks-ts#using-webllm-in-a-browser) · [VibeGen browser example](https://github.com/vibe-engineers/vibegen-ts#using-webllm-in-a-browser) · [VibeRetry browser example](https://github.com/vibe-engineers/viberetry-ts#using-webllm-in-a-browser)
 
 ## Navigating this Developer Guide
 
@@ -34,20 +36,20 @@ npm ci
 npm test
 ```
 
-Provider SDKs are development dependencies here and optional peers for consumers. Install the SDK your application uses, choosing `openai@^7.62.0`, `@google/genai@^3.6.1`, or `@typesafe-ai/sdk@^0.7.0`. A Jev application creates a `TypeSafeClient` from `@typesafe-ai/sdk` with `TYPESAFE_API_KEY` set in the environment. [TypeSafe JavaScript SDK](https://github.com/typesafe-ai/typesafe-sdk-js)
+Provider SDKs are optional peers. Install the SDK your application uses, choosing `openai@^7.62.0`, `@google/genai@^3.6.1`, `@typesafe-ai/sdk@^0.7.0`, or `@mlc-ai/web-llm@^0.2.89`. A Jev application creates a `TypeSafeClient` from `@typesafe-ai/sdk` with `TYPESAFE_API_KEY` set in the environment. [TypeSafe JavaScript SDK](https://github.com/typesafe-ai/typesafe-sdk-js)
 
 To use a local VibeTools build in another application, pack this repository and install the archive in that application's directory. For live calls, install the chosen SDK there using the version range in `peerDependencies`. [Package manifest](../package.json)
 
 ```sh
 npm pack
-npm install --prefix /path/to/your-app "$PWD/vibe-engineers-vibetools-0.1.0.tgz"
+npm install --prefix /path/to/your-app "$PWD/vibe-engineers-vibetools-0.1.1.tgz"
 ```
 
 ## Project Structure
 
 - _src/index.ts_ exports the shared configuration and exceptions.
 - *src/_internal/* contains `VibeConfig`, the retry modes, `VibeLlmClient`, the Jev evaluator, the console logger, and the argument formatting shared by VibeGen and VibeRetry.
-- _src/llms/_ implements the base text evaluator, response coercion, and the OpenAI and Gemini adapters.
+- _src/llms/_ implements the base text evaluator, response coercion, and the OpenAI, Gemini, and WebLLM adapters.
 - _src/exceptions/_ defines the shared error classes.
 - _tests/_ covers configuration, evaluation, provider calls, and logging.
 - _assets/_ and _docs/_ contain the project image and this guide.
@@ -73,17 +75,23 @@ const product = await llm.vibe_eval("What is 3.5 times 2? Reply with only the nu
 console.log(product)
 ```
 
-VibeTools recognizes SDK clients by their constructors. Your application and VibeTools must resolve the same installed copy of the provider SDK. This also applies to helpers that create clients. ESM and CommonJS imports from that installation both work. To change the model, instruction, and retry settings together, construct a new client with the new configuration.
+On Node, VibeTools recognizes OpenAI, Gemini, and Jev SDK clients by their constructors. Your application and VibeTools must resolve the same installed copy of the provider SDK. This also applies to helpers that create clients. ESM and CommonJS imports from that installation both work. To change the model, instruction, and retry settings together, construct a new client with the new configuration.
 
 ### Shared LLM primitives
 
-The OpenAI wrapper calls `responses.create` and reads `output_text`. The Gemini wrapper calls `models.generateContent` and reads `text`. Both forward the configured model, instruction, and prompt. They trim whitespace at the edges of the reply using Python's `str.strip` rules. The base evaluator applies the requested response type and retries provider or parse failures according to the configured mode.
+The OpenAI wrapper calls `responses.create` and reads `output_text`, which combines the text from output messages. The Gemini wrapper calls `models.generateContent` and reads `text`, which combines the visible text parts of the first candidate. Both forward the configured model, instruction, and prompt. They trim whitespace at the edges of the reply using Python's `str.strip` rules. The base evaluator applies the requested response type and retries provider or parse failures according to the configured mode.
+
+WebLLM uses the first completion's text. Boolean results and VibeRetry decisions use grammar-constrained decoding. A retry decision contains a boolean `should_retry` and an integer `delay`. VibeGen requests JSON objects, arrays, or any JSON value according to the declared return type, then applies the usual parser or the application's validator. These formats constrain syntax. Test the model on the values and retry decisions your application expects. Each companion includes worked examples with its default system instruction. Supplying a custom instruction or setting it to `null` omits those examples.
+
+When the engine reports a finish reason, a check, a retry decision, or a generated function result requires `stop`. This includes a VibeGen function that returns text. A token limit or interruption raises a parse error and uses the configured evaluation retry policy. A direct call on the base `WebLlmWrapper` can read partial text when the return type is omitted or is `String`. After the deadline the wrapper skips new attempts and user schema callbacks, including when JSON decoding used the remaining time. The application retains control of generation already submitted to its engine.
+
+VibeGen and VibeRetry use Node's `util.inspect` to format function arguments on Node. Browser bundles use JSON-style quotes, mark circular references, and describe ordinary accessor properties without calling their getters. They include header and form entries. For `ArrayBuffer`, `SharedArrayBuffer`, and `DataView`, the prompt includes the byte length and up to the first 64 visible bytes. Files and blobs contribute metadata. If the model needs their contents, pass the relevant text or values explicitly. Other browser objects contribute their own enumerable properties.
 
 The Jev adapter asks one Noul question per SDK call and validates the answer as a finite number in the inclusive range `0` to `1`. VibeChecks and VibeRetry apply their own decision thresholds. The adapter uses the shared timeout and retry settings. [TypeSafe Noul questions](https://docs.typesafe.ai/primitives/noul)
 
 ### Response types
 
-TypeScript types are erased at runtime. The second argument to `vibe_eval` tells VibeTools how to interpret an OpenAI or Gemini text response.
+TypeScript types are erased at runtime. The second argument to `vibe_eval` tells VibeTools how to interpret an OpenAI, Gemini, or WebLLM text response.
 
 | Argument                      | Result                                                                                   | Example model text       |
 | ----------------------------- | ---------------------------------------------------------------------------------------- | ------------------------ |
@@ -153,7 +161,7 @@ Pass a named `ConsoleLogger` to the shared client. It writes to standard error. 
 
 ### Exception taxonomy
 
-All five exception classes can be imported from `@vibe-engineers/vibetools` or `@vibe-engineers/vibetools/exceptions`. The provider wrappers raise the final API or parse error directly. A `VibeLlmApiException` keeps the SDK's original rejection value in its `cause`. When its attempts run out, `VibeLlmClient.vibe_eval` rejects with an `Error` whose own `cause` is the final API or parse exception.
+All five exception classes can be imported from `@vibe-engineers/vibetools` or `@vibe-engineers/vibetools/exceptions`. The OpenAI and Gemini wrappers raise the final API or parse error directly. A `VibeLlmApiException` keeps the SDK's original rejection value in its `cause`. When attempts run out, `VibeLlmClient.vibe_eval` and `WebLlmWrapper.vibe_eval` reject with an `Error` whose own `cause` is the final API or parse exception.
 
 | Exception                    | When the caller sees it                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -169,7 +177,7 @@ Document provider-specific request fields in the wrapper that uses them. Include
 
 ## Testing
 
-Run `npm run lint` and `npm test`. The test command builds VibeTools, type-checks its public declarations, and runs offline tests for response parsing, provider requests, retries, timeouts, and error causes. To inspect the package contents, run `npm pack --dry-run`.
+Run `npm run lint` and `npm test`. The test command builds VibeTools, type-checks its public declarations, and runs offline tests for response parsing, provider requests, retries, timeouts, and browser argument formatting. CI also installs the npm archive in clean projects and exercises the hosted SDKs and the browser exports. To inspect the package contents, run `npm pack --dry-run`.
 
 Each companion package compares its behavior with the Python implementation. To verify a VibeTools change, pack it, install the archive in the affected package, and run `npm run test:parity` there. [VibeChecks tests](https://github.com/vibe-engineers/vibechecks-ts/blob/main/docs/DeveloperGuide.md#testing) · [VibeGen tests](https://github.com/vibe-engineers/vibegen-ts/blob/main/docs/DeveloperGuide.md#testing) · [VibeRetry tests](https://github.com/vibe-engineers/viberetry-ts/blob/main/docs/DeveloperGuide.md#testing)
 
