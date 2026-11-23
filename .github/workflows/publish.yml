@@ -110,7 +110,7 @@ jobs:
   verify:
     needs: [inspect, publish]
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 22
     permissions: {}
     steps:
       - name: Confirm public npm integrity and provenance
@@ -124,7 +124,7 @@ jobs:
           url="https://registry.npmjs.org/@$name/$version"
           tarball="https://registry.npmjs.org/@$name/-/${name##*/}-$version.tgz"
           # npm processes new releases asynchronously after accepting the upload.
-          deadline=$((SECONDS + 600))
+          deadline=$((SECONDS + 1200))
           while true; do
             if curl -fsS --max-time 10 "$url" | jq -e --arg integrity "sha512-$EXPECTED_INTEGRITY" \
               '.dist.integrity == $integrity and .dist.attestations.provenance.predicateType == "https://slsa.dev/provenance/v1"' &&
