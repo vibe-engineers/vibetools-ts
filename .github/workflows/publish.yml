@@ -110,6 +110,7 @@ jobs:
   verify:
     needs: [inspect, publish]
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     permissions: {}
     steps:
       - name: Confirm public npm integrity and provenance
@@ -121,13 +122,16 @@ jobs:
           name="${GITHUB_REPOSITORY%-ts}"
           version="${GITHUB_REF_NAME#v}"
           url="https://registry.npmjs.org/@$name/$version"
-          for delay in 0 1 2 4 8 16 32; do
-            sleep "$delay"
+          # npm processes new releases asynchronously after accepting the upload.
+          deadline=$((SECONDS + 600))
+          while true; do
             if curl -fsS --max-time 10 "$url" | jq -e --arg integrity "sha512-$EXPECTED_INTEGRITY" \
               '.dist.integrity == $integrity and .dist.attestations.provenance.predicateType == "https://slsa.dev/provenance/v1"'; then
               printf '[View @%s@%s on npm](https://www.npmjs.com/package/@%s/v/%s)\n' "$name" "$version" "$name" "$version" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
+            if (( SECONDS >= deadline )); then break; fi
+            sleep 15
           done
           echo "::error::npm did not return the tested integrity and signed provenance for @$name@$version."
           exit 1
