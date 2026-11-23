@@ -4,6 +4,12 @@ on:
     branches: [main, development]
   pull_request:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release_archive:
+        description: Upload the npm archive that passed the installed-package tests
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -26,9 +32,11 @@ jobs:
       - if: matrix.node != '22.13.0'
         run: npm pack --dry-run
       - name: Test each optional provider against the installed npm archive
+        id: packed
         if: matrix.node == '22.13.0'
         run: |
           archive=$(npm pack --silent --pack-destination "$RUNNER_TEMP")
+          printf 'path=%s\n' "$RUNNER_TEMP/$archive" >> "$GITHUB_OUTPUT"
           for provider in openai @google/genai @typesafe-ai/sdk; do
             consumer=$(mktemp -d)
             version=$(node -p "require('./package.json').devDependencies[process.argv[1]]" "$provider")
@@ -49,3 +57,12 @@ jobs:
               node --test --test-name-pattern="$pattern" "$testfile"
             )
           done
+      - name: Upload the tested npm archive
+        if: inputs.release_archive && matrix.node == '22.13.0'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-package
+          path: ${{ steps.packed.outputs.path }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7

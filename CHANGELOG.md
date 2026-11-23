@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (0.1.0)
+## 0.1.0
 
 - Added an optional TypeSafe Jev adapter for probability judgments in VibeChecks and VibeRetry.
 - Ported the OpenAI and Gemini wrappers, shared configuration, retry modes, timeout handling, console logger, and exception classes to TypeScript.

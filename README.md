@@ -24,7 +24,7 @@
 
 **VibeTools** is the internal TypeScript package shared by VibeChecks, VibeGen, and VibeRetry. Each installs it automatically. Install VibeTools directly when developing a library that uses the shared clients, configuration, logging, or exceptions. [VibeChecks](https://github.com/vibe-engineers/vibechecks-ts) · [VibeGen](https://github.com/vibe-engineers/vibegen-ts) · [VibeRetry](https://github.com/vibe-engineers/viberetry-ts)
 
-Once the first npm release is available, library developers can install VibeTools from npm.
+Install VibeTools from npm.
 
 ```sh
 npm install @vibe-engineers/vibetools
