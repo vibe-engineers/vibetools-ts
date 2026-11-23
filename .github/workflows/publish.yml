@@ -122,16 +122,20 @@ jobs:
           name="${GITHUB_REPOSITORY%-ts}"
           version="${GITHUB_REF_NAME#v}"
           url="https://registry.npmjs.org/@$name/$version"
+          tarball="https://registry.npmjs.org/@$name/-/${name##*/}-$version.tgz"
           # npm processes new releases asynchronously after accepting the upload.
           deadline=$((SECONDS + 600))
           while true; do
             if curl -fsS --max-time 10 "$url" | jq -e --arg integrity "sha512-$EXPECTED_INTEGRITY" \
-              '.dist.integrity == $integrity and .dist.attestations.provenance.predicateType == "https://slsa.dev/provenance/v1"'; then
+              '.dist.integrity == $integrity and .dist.attestations.provenance.predicateType == "https://slsa.dev/provenance/v1"' &&
+              curl -fsS --max-time 30 "$tarball" --output "$RUNNER_TEMP/published.tgz"; then
+              actual=$(openssl dgst -sha512 -binary "$RUNNER_TEMP/published.tgz" | openssl base64 -A)
+              [[ "$actual" == "$EXPECTED_INTEGRITY" ]] || { echo "::error::Published tarball differs from the tested archive"; exit 1; }
               printf '[View @%s@%s on npm](https://www.npmjs.com/package/@%s/v/%s)\n' "$name" "$version" "$name" "$version" >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             if (( SECONDS >= deadline )); then break; fi
             sleep 15
           done
-          echo "::error::npm did not return the tested integrity and signed provenance for @$name@$version."
+          echo "::error::npm did not serve the tested tarball, integrity and signed provenance for @$name@$version."
           exit 1
