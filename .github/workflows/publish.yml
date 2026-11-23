@@ -37,7 +37,7 @@ jobs:
         with:
           name: npm-package
           path: release
-      - name: Verify the tested archive and preview staging
+      - name: Verify the tested archive and preview publication
         id: archive
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -50,6 +50,10 @@ jobs:
           archive="./${archives[0]}"
           name="${GITHUB_REPOSITORY%-ts}"
           version=$(jq -er '.version' package.json)
+          if [[ ! "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Use a canonical npm version without build metadata."
+            exit 1
+          fi
           tar -xOzf "$archive" package/package.json | jq -e \
             --arg name "@$name" --arg version "$version" \
             --arg repo "git+https://github.com/$GITHUB_REPOSITORY.git" \
@@ -57,7 +61,7 @@ jobs:
 
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             [[ "$GITHUB_REF_NAME" == "v$version" ]] || { echo "::error::The tag must match v$version"; exit 1; }
-            git merge-base --is-ancestor HEAD "origin/$DEFAULT_BRANCH" || { echo "::error::Tag a commit on $DEFAULT_BRANCH"; exit 1; }
+            git merge-base --is-ancestor HEAD "refs/remotes/origin/$DEFAULT_BRANCH" || { echo "::error::Tag a commit on $DEFAULT_BRANCH"; exit 1; }
           fi
           channel=latest
           if [[ "$version" == *-* ]]; then channel=next; fi
@@ -65,10 +69,12 @@ jobs:
           printf 'channel=%s\nintegrity=%s\n' "$channel" "$integrity" >> "$GITHUB_OUTPUT"
           printf 'Package: @%s@%s\n\nDist-tag: %s\n\nIntegrity: sha512-%s\n' "$name" "$version" "$channel" "$integrity" >> "$GITHUB_STEP_SUMMARY"
 
-          npm stage publish "$archive" --dry-run --ignore-scripts --provenance --access public \
-            --tag "$channel" --registry=https://registry.npmjs.org
+          tag_args=()
+          if [[ "$channel" != latest ]]; then tag_args=(--tag "$channel"); fi
+          npm publish "$archive" --dry-run --ignore-scripts --provenance --access public \
+            "${tag_args[@]}" --registry=https://registry.npmjs.org
 
-  stage:
+  publish:
     needs: inspect
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
@@ -84,7 +90,7 @@ jobs:
         with:
           name: npm-package
           path: release
-      - name: Stage the verified archive with npm provenance
+      - name: Publish the verified archive with npm provenance
         env:
           RELEASE_CHANNEL: ${{ needs.inspect.outputs.channel }}
           EXPECTED_INTEGRITY: ${{ needs.inspect.outputs.integrity }}
@@ -96,5 +102,32 @@ jobs:
           [[ ${#archives[@]} == 1 ]]
           archive="${archives[0]}"
           [[ "$(openssl dgst -sha512 -binary "$archive" | openssl base64 -A)" == "$EXPECTED_INTEGRITY" ]]
-          npm stage publish "$archive" --ignore-scripts --provenance --access public \
-            --tag "$RELEASE_CHANNEL" --registry=https://registry.npmjs.org
+          tag_args=()
+          if [[ "$RELEASE_CHANNEL" != latest ]]; then tag_args=(--tag "$RELEASE_CHANNEL"); fi
+          npm publish "$archive" --ignore-scripts --provenance --access public \
+            "${tag_args[@]}" --registry=https://registry.npmjs.org
+
+  verify:
+    needs: [inspect, publish]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Confirm public npm integrity and provenance
+        env:
+          EXPECTED_INTEGRITY: ${{ needs.inspect.outputs.integrity }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="${GITHUB_REPOSITORY%-ts}"
+          version="${GITHUB_REF_NAME#v}"
+          url="https://registry.npmjs.org/@$name/$version"
+          for delay in 1 2 4 8 16 32; do
+            if curl -fsS --max-time 10 "$url" | jq -e --arg integrity "sha512-$EXPECTED_INTEGRITY" \
+              '.dist.integrity == $integrity and .dist.attestations.provenance.predicateType == "https://slsa.dev/provenance/v1"'; then
+              printf '[View @%s@%s on npm](https://www.npmjs.com/package/@%s/v/%s)\n' "$name" "$version" "$name" "$version" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep "$delay"
+          done
+          echo "::error::npm did not return the tested integrity and signed provenance for @$name@$version."
+          exit 1
