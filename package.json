@@ -1,0 +1,74 @@
+{
+  "name": "@vibe-engineers/vibetools",
+  "version": "0.1.0",
+  "description": "Core modules shared across Vibe Engineers libraries.",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "homepage": "https://github.com/vibe-engineers/vibetools-ts#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vibe-engineers/vibetools-ts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vibe-engineers/vibetools-ts/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./_internal": "./dist/_internal/index.js",
+    "./_internal/*": "./dist/_internal/*.js",
+    "./exceptions": "./dist/exceptions/exceptions.js",
+    "./exceptions/exceptions": "./dist/exceptions/exceptions.js",
+    "./llms/*": "./dist/llms/*.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md",
+    "docs",
+    "assets",
+    ".env.template"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && tsc -p tsconfig.tests.json && node --test tests/*.test.mjs",
+    "lint": "biome lint --config-path=./biome.json .",
+    "format": "biome format --config-path=./biome.json --write .",
+    "prepack": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\" && npm run build"
+  },
+  "peerDependencies": {
+    "@google/genai": "^3.6.1",
+    "@typesafe-ai/sdk": "^0.7.0",
+    "openai": "^7.62.0"
+  },
+  "peerDependenciesMeta": {
+    "@google/genai": {
+      "optional": true
+    },
+    "@typesafe-ai/sdk": {
+      "optional": true
+    },
+    "openai": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
+    "@google/genai": "3.6.1",
+    "@types/node": "22.20.5",
+    "@typesafe-ai/sdk": "0.7.0",
+    "openai": "7.62.0",
+    "typescript": "5.9.3"
+  }
+}

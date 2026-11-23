@@ -1,0 +1,6 @@
+{
+  "root": false,
+  "files": { "includes": ["**", "!**/dist", "!**/node_modules", "!**/package-lock.json"] },
+  "formatter": { "indentStyle": "space", "lineWidth": 100 },
+  "javascript": { "formatter": { "semicolons": "asNeeded" } }
+}
